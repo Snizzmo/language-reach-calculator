@@ -1,0 +1,196 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Language Reach Calculator</title>
+    <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f2f2f2;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            text-align: center;
+            color: #333;
+        }
+        label, input, button {
+            display: block;
+            width: 100%;
+            margin: 15px 0;
+        }
+        input {
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            padding: 12px;
+            font-size: 16px;
+            background-color: #4e79a7;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3a5e85;
+        }
+        .result-container {
+            margin-top: 30px;
+        }
+        canvas {
+            margin-top: 30px;
+        }
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            background: white;
+        }
+        th, td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #eee;
+        }
+        .purpose-box {
+            background: #f9f9f9;
+            padding: 15px;
+            margin-top: 20px;
+            border-left: 4px solid #4e79a7;
+        }
+        .purpose-box h3 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Language Reach Calculator</h1>
+        <p>Type and select the languages you already speak. Remove with backspace or "x".</p>
+        <input id="languageInput" placeholder="e.g. English, French">
+        <button onclick="calculateReach()">Calculate Unique Reach</button>
+
+        <div class="result-container" id="results" style="display:none;">
+            <h2>Recommended Languages to Expand Your Global Reach</h2>
+            <canvas id="reachChart" height="150"></canvas>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Language</th>
+                        <th>Estimated Unique People Gained (Millions)</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+
+            <div class="purpose-box">
+                <h3>Suggestions by Purpose</h3>
+                <ul>
+                    <li><strong>Best for Global Reach:</strong> Mandarin Chinese, Hindi/Urdu, Arabic</li>
+                    <li><strong>Best for Travel:</strong> Spanish, French, Arabic</li>
+                    <li><strong>Best for Africa:</strong> French, Arabic, Portuguese</li>
+                    <li><strong>Best for Business:</strong> Mandarin Chinese, Spanish, Portuguese</li>
+                    <li><strong>Best for Asia:</strong> Mandarin Chinese, Hindi/Urdu, Bengali, Indonesian</li>
+                    <li><strong>Best for Latin America:</strong> Spanish, Portuguese</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const languageData = {
+            "English": { total: 1500, overlap: 0 },
+            "Mandarin Chinese": { total: 1200, overlap: 20 },
+            "Hindi/Urdu": { total: 700, overlap: 30 },
+            "Arabic": { total: 400, overlap: 25 },
+            "Bengali": { total: 270, overlap: 10 },
+            "Indonesian": { total: 250, overlap: 10 },
+            "Portuguese": { total: 260, overlap: 20 },
+            "Russian": { total: 260, overlap: 30 },
+            "Spanish": { total: 600, overlap: 40 },
+            "French": { total: 300, overlap: 35 }
+        };
+
+        const languageList = Object.keys(languageData);
+        const input = document.querySelector('#languageInput');
+        const tagify = new Tagify(input, {
+            whitelist: languageList,
+            dropdown: {
+                enabled: 1,
+                maxItems: 10
+            }
+        });
+
+        let chart;
+
+        function calculateReach() {
+            const selected = tagify.value.map(item => item.value.toLowerCase());
+            const knownSet = new Set(selected);
+
+            let knownCoverage = 0;
+            for (const [lang, data] of Object.entries(languageData)) {
+                if (knownSet.has(lang.toLowerCase())) {
+                    knownCoverage += data.total * (1 - data.overlap / 100);
+                }
+            }
+
+            const recommendations = [];
+            for (const [lang, data] of Object.entries(languageData)) {
+                if (!knownSet.has(lang.toLowerCase())) {
+                    const unique = Math.round(data.total * (1 - data.overlap / 100));
+                    recommendations.push({ lang, unique });
+                }
+            }
+
+            recommendations.sort((a, b) => b.unique - a.unique);
+            const tableBody = document.getElementById("resultsBody");
+            tableBody.innerHTML = "";
+            recommendations.forEach(r => {
+                tableBody.innerHTML += `<tr><td>${r.lang}</td><td>${r.unique}</td></tr>`;
+            });
+
+            const ctx = document.getElementById("reachChart").getContext("2d");
+            if (chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: recommendations.map(r => r.lang),
+                    datasets: [{
+                        label: 'Unique People Gained (Millions)',
+                        data: recommendations.map(r => r.unique),
+                        backgroundColor: '#4e79a7'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 100 }
+                        }
+                    }
+                }
+            });
+
+            document.getElementById("results").style.display = "block";
+        }
+    </script>
+</body>
+</html>
