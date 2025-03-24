@@ -7,24 +7,32 @@
     <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo"></script>
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
-            background-color: #f2f2f2;
             margin: 0;
             padding: 0;
+            transition: background 0.3s, color 0.3s;
+        }
+        .light-mode {
+            background-color: #f2f2f2;
+            color: #333;
+        }
+        .dark-mode {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
         }
         .container {
             max-width: 800px;
             margin: 50px auto;
-            background: #ffffff;
             padding: 40px;
             border-radius: 10px;
             box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            background-color: inherit;
         }
         h1, h2 {
             text-align: center;
-            color: #333;
         }
         label, input, button {
             display: block;
@@ -36,6 +44,7 @@
             font-size: 16px;
             border: 1px solid #ccc;
             border-radius: 5px;
+            width: 100% !important;
         }
         button {
             padding: 12px;
@@ -59,7 +68,6 @@
             width: 100%;
             margin-top: 20px;
             border-collapse: collapse;
-            background: white;
         }
         th, td {
             padding: 10px;
@@ -69,18 +77,38 @@
         th {
             background-color: #eee;
         }
+        .dark-mode table, .dark-mode th, .dark-mode td {
+            background-color: #333;
+            border-color: #555;
+        }
         .purpose-box {
             background: #f9f9f9;
             padding: 15px;
             margin-top: 20px;
             border-left: 4px solid #4e79a7;
         }
+        .dark-mode .purpose-box {
+            background: #2c2c2c;
+        }
         .purpose-box h3 {
             margin-top: 0;
         }
+        .coverage {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .toggle-container {
+            text-align: right;
+            margin-top: -30px;
+        }
     </style>
 </head>
-<body>
+<body class="light-mode">
+    <div class="toggle-container">
+        <button onclick="toggleDarkMode()">Toggle Dark Mode</button>
+    </div>
     <div class="container">
         <h1>Language Reach Calculator</h1>
         <p>Type and select the languages you already speak. Remove with backspace or "x".</p>
@@ -88,6 +116,7 @@
         <button onclick="calculateReach()">Calculate Unique Reach</button>
 
         <div class="result-container" id="results" style="display:none;">
+            <div id="coverageText" class="coverage"></div>
             <h2>Recommended Languages to Expand Your Global Reach</h2>
             <canvas id="reachChart" height="150"></canvas>
             <table>
@@ -103,14 +132,18 @@
             <div class="purpose-box">
                 <h3>Suggestions by Purpose</h3>
                 <ul>
-                    <li><strong>Best for Global Reach:</strong> Mandarin Chinese, Hindi/Urdu, Arabic</li>
-                    <li><strong>Best for Travel:</strong> Spanish, French, Arabic</li>
-                    <li><strong>Best for Africa:</strong> French, Arabic, Portuguese</li>
-                    <li><strong>Best for Business:</strong> Mandarin Chinese, Spanish, Portuguese</li>
+                    <li><strong>Best for Global Reach:</strong> English, Mandarin Chinese, Hindi/Urdu, Arabic</li>
+                    <li><strong>Best for Travel:</strong> English, Spanish, French, Arabic</li>
+                    <li><strong>Best for Africa:</strong> English, French, Arabic, Portuguese</li>
+                    <li><strong>Best for Business:</strong> English, Mandarin Chinese, Spanish, Portuguese</li>
                     <li><strong>Best for Asia:</strong> Mandarin Chinese, Hindi/Urdu, Bengali, Indonesian</li>
                     <li><strong>Best for Latin America:</strong> Spanish, Portuguese</li>
                 </ul>
             </div>
+
+            <h2>Optional: Regional Heatmap</h2>
+            <p>(Experimental – requires internet)</p>
+            <canvas id="heatMap" width="700" height="350"></canvas>
         </div>
     </div>
 
@@ -128,10 +161,10 @@
             "French": { total: 300, overlap: 35 }
         };
 
-        const languageList = Object.keys(languageData);
+        const worldPopulation = 8100;
         const input = document.querySelector('#languageInput');
         const tagify = new Tagify(input, {
-            whitelist: languageList,
+            whitelist: Object.keys(languageData),
             dropdown: {
                 enabled: 1,
                 maxItems: 10
@@ -150,6 +183,10 @@
                     knownCoverage += data.total * (1 - data.overlap / 100);
                 }
             }
+
+            const percentCoverage = ((knownCoverage / worldPopulation) * 100).toFixed(1);
+            document.getElementById("coverageText").innerText =
+                `You can now communicate with approximately ${Math.round(knownCoverage)} million unique people (~${percentCoverage}% of the world's population).`;
 
             const recommendations = [];
             for (const [lang, data] of Object.entries(languageData)) {
@@ -181,15 +218,23 @@
                 options: {
                     responsive: true,
                     scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: { stepSize: 100 }
-                        }
+                        y: { beginAtZero: true, ticks: { stepSize: 100 } }
                     }
                 }
             });
 
             document.getElementById("results").style.display = "block";
+        }
+
+        function toggleDarkMode() {
+            const body = document.body;
+            if (body.classList.contains("dark-mode")) {
+                body.classList.remove("dark-mode");
+                body.classList.add("light-mode");
+            } else {
+                body.classList.remove("light-mode");
+                body.classList.add("dark-mode");
+            }
         }
     </script>
 </body>
