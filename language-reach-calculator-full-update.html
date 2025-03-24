@@ -1,0 +1,217 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Language Reach Calculator</title>
+    <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@3"></script>
+    <script src="https://unpkg.com/world-atlas/countries-50m.json"></script>
+    <style>
+        :root {
+            --bg-color: #f2f2f2;
+            --text-color: #333;
+            --card-bg: #ffffff;
+            --table-bg: #fff;
+            --table-border: #ddd;
+            --button-bg: #4e79a7;
+            --button-hover: #3a5e85;
+        }
+        body.dark-mode {
+            --bg-color: #1e1e1e;
+            --text-color: #e0e0e0;
+            --card-bg: #2a2a2a;
+            --table-bg: #333;
+            --table-border: #555;
+            --button-bg: #6ca0dc;
+            --button-hover: #4b7cb8;
+        }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 50px auto;
+            background: var(--card-bg);
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        input, button, select {
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin: 10px 0;
+            width: 100%;
+        }
+        button {
+            background-color: var(--button-bg);
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: var(--button-hover);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--table-bg);
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid var(--table-border);
+        }
+        .coverage, .toggle-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        canvas {
+            margin-top: 30px;
+        }
+        .purpose-box {
+            margin-top: 30px;
+            padding: 15px;
+            background: var(--table-bg);
+            border-left: 5px solid var(--button-bg);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="toggle-container">
+            <button onclick="toggleDarkMode()">Toggle Dark Mode</button>
+            <button onclick="toggleMode()">Toggle Speakers/Countries</button>
+        </div>
+
+        <h1>Language Reach Calculator</h1>
+        <input id="languageInput" placeholder="e.g. English, French">
+        <button onclick="calculateReach()">Calculate Unique Reach</button>
+
+        <div id="coverageText" class="coverage"></div>
+        <canvas id="reachChart" height="150"></canvas>
+        <table>
+            <thead>
+                <tr>
+                    <th>Language</th>
+                    <th id="valueLabel">Estimated Unique People Gained (Millions)</th>
+                </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+        </table>
+
+        <div class="purpose-box">
+            <h3>Suggestions by Purpose</h3>
+            <ul>
+                <li><strong>Best for Global Reach:</strong> English, Mandarin Chinese, Hindi/Urdu, Arabic</li>
+                <li><strong>Best for Travel:</strong> English, Spanish, French, Arabic</li>
+                <li><strong>Best for Africa:</strong> English, French, Arabic, Portuguese</li>
+                <li><strong>Best for Business:</strong> English, Mandarin Chinese, Spanish, Portuguese</li>
+                <li><strong>Best for Asia:</strong> Mandarin Chinese, Hindi/Urdu, Bengali, Indonesian</li>
+                <li><strong>Best for Latin America:</strong> Spanish, Portuguese</li>
+            </ul>
+        </div>
+
+        <h2>Regional Heatmap</h2>
+        <canvas id="heatMap" width="700" height="350"></canvas>
+    </div>
+
+    <script>
+        const languageData = {
+            "English": { total: 1500, overlap: 0, countries: 100 },
+            "Mandarin Chinese": { total: 1200, overlap: 20, countries: 5 },
+            "Hindi/Urdu": { total: 700, overlap: 30, countries: 4 },
+            "Arabic": { total: 400, overlap: 25, countries: 25 },
+            "Bengali": { total: 270, overlap: 10, countries: 2 },
+            "Indonesian": { total: 250, overlap: 10, countries: 1 },
+            "Portuguese": { total: 260, overlap: 20, countries: 10 },
+            "Russian": { total: 260, overlap: 30, countries: 12 },
+            "Spanish": { total: 600, overlap: 40, countries: 20 },
+            "French": { total: 300, overlap: 35, countries: 29 }
+        };
+
+        const worldPopulation = 8100;
+        const input = document.querySelector('#languageInput');
+        const tagify = new Tagify(input, {
+            whitelist: Object.keys(languageData),
+            dropdown: { enabled: 1, maxItems: 10 }
+        });
+
+        let chart;
+        let mode = "speakers"; // or "countries"
+
+        function toggleDarkMode() {
+            document.body.classList.toggle("dark-mode");
+        }
+
+        function toggleMode() {
+            mode = mode === "speakers" ? "countries" : "speakers";
+            document.getElementById("valueLabel").innerText =
+                mode === "speakers" ? "Estimated Unique People Gained (Millions)" : "Number of Countries";
+            calculateReach();
+        }
+
+        function calculateReach() {
+            const selected = tagify.value.map(item => item.value.toLowerCase());
+            const knownSet = new Set(selected);
+            let knownCoverage = 0;
+
+            for (const [lang, data] of Object.entries(languageData)) {
+                if (knownSet.has(lang.toLowerCase()) && mode === "speakers") {
+                    knownCoverage += data.total * (1 - data.overlap / 100);
+                }
+            }
+
+            const recommendations = [];
+            for (const [lang, data] of Object.entries(languageData)) {
+                if (!knownSet.has(lang.toLowerCase())) {
+                    const value = mode === "speakers"
+                        ? Math.round(data.total * (1 - data.overlap / 100))
+                        : data.countries;
+                    recommendations.push({ lang, value });
+                }
+            }
+
+            recommendations.sort((a, b) => b.value - a.value);
+            document.getElementById("resultsBody").innerHTML = recommendations.map(r =>
+                `<tr><td>${r.lang}</td><td>${r.value}</td></tr>`).join("");
+
+            if (mode === "speakers") {
+                const percentCoverage = ((knownCoverage / worldPopulation) * 100).toFixed(1);
+                document.getElementById("coverageText").innerText =
+                    `You can now communicate with approximately ${Math.round(knownCoverage)} million unique people (~${percentCoverage}% of the world's population).`;
+            } else {
+                document.getElementById("coverageText").innerText = "";
+            }
+
+            const ctx = document.getElementById("reachChart").getContext("2d");
+            if (chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: recommendations.map(r => r.lang),
+                    datasets: [{
+                        label: mode === "speakers" ? 'Unique People Gained (Millions)' : 'Number of Countries',
+                        data: recommendations.map(r => r.value),
+                        backgroundColor: '#4e79a7'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
